@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Buy-In and Cash-Out Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .field-group {
+            margin-bottom: 15px;
+        }
+        .field-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .field-group input, .field-group select {
+            width: calc(100% - 10px);
+            padding: 10px;
+            font-size: 16px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        .field-group .half-width {
+            width: 48%;
+            display: inline-block;
+        }
+        .field-group .half-width:first-child {
+            margin-right: 4%;
+        }
+        .stack-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stack-controls button {
+            flex-grow: 1;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        .stack-controls input {
+            width: 30%;
+            text-align: center;
+            padding: 10px;
+        }
+        .add-player-btn, .calculate-btn, .clear-storage-btn {
+            width: 100%;
+            padding: 15px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        .add-player-btn {
+            background-color: #007bff;
+        }
+        .calculate-btn {
+            background-color: #28a745;
+        }
+        .clear-storage-btn {
+            background-color: #dc3545;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .balance-warning {
+            color: red;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .balance-ok {
+            color: green;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Poker Buy-In and Cash-Out Calculator</h1>
+    <div class="container">
+        <div class="field-group">
+            <label>Currency:</label>
+            <select id="currency">
+                <option value="CAD">CAD</option>
+                <option value="HKD">HKD</option>
+            </select>
+        </div>
+        <div class="field-group">
+            <label>Value of 1 Stack:</label>
+            <input type="number" id="stack-value" value="600" placeholder="Enter value of 1 stack">
+        </div>
+        <div id="player-container"></div>
+        <button class="add-player-btn" onclick="addPlayer()">Add Player</button>
+        <button class="calculate-btn" onclick="calculateResults()">Calculate Results</button>
+        <button class="clear-storage-btn" onclick="clearStorage()">Clear Saved Data</button>
+        <div class="results" id="results"></div>
+        <div id="balance-warning"></div>
+        <div class="results" id="payouts"></div>
+    </div>
+
+    <script>
+        let playerCount = 0;
+
+        window.onload = function() {
+            loadPlayers();
+        };
+
+        function addPlayer(name = '', buyin = '', cashout = '', stackCount = 0) {
+            playerCount++;
+            const playerContainer = document.getElementById('player-container');
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'field-group';
+            playerDiv.innerHTML = `
+                <label>Player ${playerCount}</label>
+                <input type="text" id="name${playerCount}" value="${name}" placeholder="Name" class="half-width">
+                <input type="number" id="buyin${playerCount}" value="${buyin}" placeholder="Buy-In" class="half-width">
+                <input type="number" id="cashout${playerCount}" value="${cashout}" placeholder="Cash-Out" class="half-width">
+                <div class="stack-controls">
+                    <button onclick="addStack(${playerCount})">Add Stack</button>
+                    <input type="number" id="stacks${playerCount}" value="${stackCount}" readonly>
+                </div>
+            `;
+            playerContainer.appendChild(playerDiv);
+            savePlayers();
+        }
+
+        function addStack(playerId) {
+            const stackValue = parseFloat(document.getElementById('stack-value').value) || 0;
+            const buyinInput = document.getElementById(`buyin${playerId}`);
+            const stacksInput = document.getElementById(`stacks${playerId}`);
+
+            let currentBuyin = parseFloat(buyinInput.value) || 0;
+            let currentStacks = parseInt(stacksInput.value) || 0;
+
+            currentStacks += 1;
+            currentBuyin += stackValue;
+
+            buyinInput.value = currentBuyin.toFixed(2);
+            stacksInput.value = currentStacks;
+
+            savePlayers();
+        }
+
+        function calculateResults() {
+            const currency = document.getElementById('currency').value;
+            const exchangeRate = currency === 'CAD' ? 1 : 0.1667; // Example exchange rate for CAD to HKD
+            const stackValue = parseFloat(document.getElementById('stack-value').value);
+            let totalBuyin = 0;
+            let totalCashout = 0;
+            let results = `
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Buy-In (${currency})</th>
+                        <th>Cash-Out (${currency})</th>
+                        <th>Profit (${currency})</th>
+                        <th>Profit (CAD$)</th>
+                    </tr>
+            `;
+
+            let playersData = [];
+            let creditors = [];
+            let debtors = [];
+
+            for (let i = 1; i <= playerCount; i++) {
+                const name = document.getElementById(`name${i}`).value;
+                const buyin = parseFloat(document.getElementById(`buyin${i}`).value) || 0;
+                const cashout = parseFloat(document.getElementById(`cashout${i}`).value) || 0;
+                const profit = cashout - buyin;
+                const profitCAD = profit * exchangeRate;
+
+                totalBuyin += buyin;
+                totalCashout += cashout;
+
+                results += `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${buyin.toFixed(2)}</td>
+                        <td>${cashout.toFixed(2)}</td>
+                        <td>${profit.toFixed(2)}</td>
+                        <td>${profitCAD.toFixed(2)}</td>
+                    </tr>
+                `;
+
+                playersData.push({ name, buyin, cashout, profit, stackCount: document.getElementById(`stacks${i}`).value });
+
+                if (profit > 0) {
+                    creditors.push({ name, profit });
+                } else if (profit < 0) {
+                    debtors.push({ name, profit: -profit });
+                }
+            }
+
+            results += `</table>`;
+            document.getElementById('results').innerHTML = results;
+
+            checkBalance(totalBuyin, totalCashout, currency);
+            displayPayouts(creditors, debtors);
+            savePlayers(playersData);
+        }
+
+        function checkBalance(totalBuyin, totalCashout, currency) {
+            const balanceWarning = document.getElementById('balance-warning');
+            const difference = totalCashout - totalBuyin;
+
+            if (totalBuyin !== totalCashout) {
+                balanceWarning.className = 'balance-warning';
+                balanceWarning.innerHTML = `Warning: The results are not balanced! The difference is ${difference.toFixed(2)} ${currency} (${difference > 0 ? 'Cash-Out exceeds Buy-In' : 'Buy-In exceeds Cash-Out'}).`;
+            } else {
+                balanceWarning.className = 'balance-ok';
+                balanceWarning.innerHTML = `The results are balanced! Total Buy-In: ${totalBuyin.toFixed(2)} ${currency}, Total Cash-Out: ${totalCashout.toFixed(2)} ${currency}.`;
+            }
+        }
+
+        function displayPayouts(creditors, debtors) {
+            const payoutsContainer = document.getElementById('payouts');
+            payoutsContainer.innerHTML = '<h3>Payouts:</h3>';
+            creditors.sort((a, b) => b.profit - a.profit);
+            debtors.sort((a, b) => b.profit - a.profit);
+
+            while (creditors.length && debtors.length) {
+                const creditor = creditors[0];
+                const debtor = debtors[0];
+                const amount = Math.min(creditor.profit, debtor.profit);
+
+                payoutsContainer.innerHTML += `<p>${debtor.name} pays ${creditor.name} ${amount.toFixed(2)}</p>`;
+
+                creditor.profit -= amount;
+                debtor.profit -= amount;
+
+                if (creditor.profit === 0) creditors.shift();
+                if (debtor.profit === 0) debtors.shift();
+            }
+        }
+
+        function savePlayers(playersData = null) {
+            if (!playersData) {
+                playersData = [];
+                for (let i = 1; i <= playerCount; i++) {
+                    const name = document.getElementById(`name${i}`).value;
+                    const buyin = document.getElementById(`buyin${i}`).value;
+                    const cashout = document.getElementById(`cashout${i}`).value;
+                    const stackCount = document.getElementById(`stacks${i}`).value;
+                    playersData.push({ name, buyin, cashout, stackCount });
+                }
+            }
+            localStorage.setItem('playersData', JSON.stringify(playersData));
+            localStorage.setItem('stackValue', document.getElementById('stack-value').value);
+            localStorage.setItem('currency', document.getElementById('currency').value);
+        }
+
+        function loadPlayers() {
+            const playersData = JSON.parse(localStorage.getItem('playersData')) || [];
+            const stackValue = localStorage.getItem('stackValue') || '';
+            const currency = localStorage.getItem('currency') || 'CAD';
+
+            document.getElementById('stack-value').value = stackValue;
+            document.getElementById('currency').value = currency;
+            playersData.forEach(player => addPlayer(player.name, player.buyin, player.cashout, player.stackCount));
+        }
+
+        function clearStorage() {
+            if (confirm('Are you sure you want to clear all saved data?')) {
+                localStorage.clear();
+                document.getElementById('player-container').innerHTML = '';
+                document.getElementById('results').innerHTML = '';
+                document.getElementById('balance-warning').innerHTML = '';
+                document.getElementById('payouts').innerHTML = '';
+                playerCount = 0;
+            }
+        }
+    </script>
+</body>
+</html>
